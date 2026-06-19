@@ -1,6 +1,8 @@
 #include "bencode.hpp"
 #include <cctype>
 #include <stdexcept>
+#include <string>
+#include <variant>
 
 
 BencodeNode parse_list(const std::string& buffer , size_t& index);
@@ -119,4 +121,29 @@ BencodeNode parse_dict(const std::string& buffer , size_t& index) {
     BencodeNode node;
     node.data = dict_content;
     return node;
+}
+
+std::string encode_bencode(const BencodeNode& node) {
+    if (std::holds_alternative<long long>(node.data)) {
+        return "i" + std::to_string(std::get<long long>(node.data)) + "e";
+    } else if (std::holds_alternative<std::string>(node.data)) {
+        std::string s = std::get<std::string>(node.data);
+        return std::to_string(s.length()) + ":" + s;
+    } else if (std::holds_alternative<BencodeList>(node.data)) {
+        std::string res = "l";
+        for (const auto& item : std::get<BencodeList>(node.data)) {
+            res += encode_bencode(item);
+        }
+        res += "e";
+        return res; 
+    } else if (std::holds_alternative<BencodeDict>(node.data)) {
+        std::string res = "d";
+        for (const auto& [key, val] : std::get<BencodeDict>(node.data)) {
+            res += std::to_string(key.length()) + ":" + key;
+            res += encode_bencode(val);
+        }        
+        res += "e";
+        return res;
+    }
+    throw std::runtime_error("Invalid Bencode");
 }

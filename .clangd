@@ -1,2 +1,7 @@
 CompileFlags:
-  Add: [-std=c++17, -DASIO_STANDALONE, -Iinclude, -Ibuild/_deps/asio-src/asio/include]
+  Remove:
+    - "-std:c++*"
+  Add:
+    - -std=c++17
+    - -DASIO_STANDALONE
+  Compiler: clang++

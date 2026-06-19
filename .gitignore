@@ -5,6 +5,7 @@ Build/
 x64/
 Debug/
 Release/
+.cache/
 
 # ─── COMPILER TEMPORARY FILES ─────────────────────────────────────────
 # Ignore raw compiled object files and target executable formats
@@ -32,3 +33,5 @@ Release/
 # Windows folder thumbnail caches
 Thumbs.db
 desktop.ini
+
+*.torrent

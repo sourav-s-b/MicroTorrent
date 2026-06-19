@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <variant>
 #include <map>
 #include <string>
@@ -16,3 +15,5 @@ struct BencodeNode {
 };
 
 BencodeNode parse_bencode(const std::string& buffer, size_t& index);
+
+std::string encode_bencode(const BencodeNode& node);
