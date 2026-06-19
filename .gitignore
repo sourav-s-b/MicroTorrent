@@ -1,0 +1,34 @@
+# ─── CMAKE & BUILD DIRECTORIES ────────────────────────────────────────
+# Ignore the entire build output directory containing compiled binaries and caches
+build/
+Build/
+x64/
+Debug/
+Release/
+
+# ─── COMPILER TEMPORARY FILES ─────────────────────────────────────────
+# Ignore raw compiled object files and target executable formats
+*.obj
+*.o
+*.pdb
+*.ilk
+*.exe
+*.out
+*.app
+
+# ─── MSVC / VISUAL STUDIO AUTO-GENERATED ──────────────────────────────
+# Visual Studio creates hidden cache configurations when it uses MSBuild
+.vs/
+*.vcxproj.user
+*.suo
+*.user
+
+# ─── ZED & CHID EDITOR ENVIRONMENT ────────────────────────────────────
+# While .clangd is fine to keep, you don't need to track local IDE state files
+.zed/
+.directory
+
+# ─── OPERATING SYSTEM JUNK ────────────────────────────────────────────
+# Windows folder thumbnail caches
+Thumbs.db
+desktop.ini
