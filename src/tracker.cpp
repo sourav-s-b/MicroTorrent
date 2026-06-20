@@ -49,7 +49,7 @@ std::string TrackerClient::announce(const std::string& announce_url, const std::
         std::cout << "Connected successfully!\n" << std::endl;
 
 
-        std::string peer_id = generate_peer_id();
+        std::string peer_id = "-MT0001-174094882455";
         std::string encoded_info_hash = url_encode(info_hash);
 
         std::ostringstream request_stream;
