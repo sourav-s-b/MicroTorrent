@@ -1,9 +1,11 @@
 #include "peer.hpp"
 #include "asio/error_code.hpp"
+#include <algorithm>
 #include <cstdint>
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <vector>
 
 PeerClient::PeerClient(asio::io_context &io_context, const std::string &ip,
@@ -92,9 +94,6 @@ bool PeerClient::connect_and_handshake() {
                 << std::endl;
       return false;
     }
-    request_block(0, 0, 16384);
-    receive_message();
-
     return true;
 
   } catch (std::exception &e) {
@@ -151,27 +150,10 @@ int PeerClient::receive_message() {
   case 7: {
     std::cout << "\n Recieved: PIECE " << std::endl;
 
-    uint32_t piece_index = (payload[1] << 24) | (payload[2] << 16) |
-                           (payload[3] << 8) | payload[4];
-    uint32_t block_offset = (payload[5] << 24) | (payload[6] << 16) |
-                            (payload[7] << 8) | payload[8];
+    last_data_buffer_.clear();
 
-    size_t data_size = payload.size() - 9;
-
-    std::cout << "   -> Index: " << piece_index
-              << " | Offeset: " << block_offset
-              << " | Block size: " << data_size << " bytes" << std::endl;
-
-    std::ofstream out_file("debian_output_file.iso",
-                           std::ios::binary | std::ios::app);
-    if (out_file.is_open()) {
-      out_file.write(reinterpret_cast<const char *>(payload.data() + 9),
-                     data_size);
-      out_file.close();
-      std::cout << "     -> SUCCESS! Wrote data to disk!" << std::endl;
-    } else {
-      std::cerr << "     -> FAILED to open file for writing." << std::endl;
-    }
+    last_data_buffer_.insert(last_data_buffer_.end(), payload.begin() + 9,
+                             payload.end());
     break;
   }
   default:
@@ -203,4 +185,47 @@ void PeerClient::request_block(uint32_t piece_index, uint32_t block_offset,
   asio::write(socket_, asio::buffer(request_msg));
   std::cout << "  -> Sent: REQUEST for Piece " << piece_index << " at offset "
             << block_offset << " (" << block_length << " bytes)" << std::endl;
+}
+
+std::vector<uint8_t> PeerClient::download_piece(uint32_t piece_index,
+                                                uint32_t piece_length) {
+  std::vector<uint8_t> piece_buffer;
+  piece_buffer.reserve(piece_length);
+
+  uint32_t bytes_downloaded = 0;
+  const uint32_t MAX_BLOCK_LENGTH = 16 * 1024; // 16KB
+
+  while (bytes_downloaded < piece_length) {
+
+    uint32_t current_block_size =
+        std::min(MAX_BLOCK_LENGTH, piece_length - bytes_downloaded);
+
+    request_block(piece_index, bytes_downloaded, current_block_size);
+
+    int msg_id;
+    while (true) {
+                msg_id = receive_message(); 
+                
+                if (msg_id == 7) {
+                    break; 
+                } 
+                else if (msg_id < 0) {
+                    std::cerr << "  -> Error: Peer disconnected or socket failed." << std::endl;
+                    return {}; 
+                } 
+                else {
+                    std::cout << "     -> Ignoring protocol chatter (ID: " << msg_id << ")..." << std::endl;
+                }
+            }
+
+    bytes_downloaded += current_block_size;
+    piece_buffer.insert(piece_buffer.end(), last_data_buffer_.begin(),
+                        last_data_buffer_.end());
+
+    std::cout << "     -> Progress: " << bytes_downloaded << " / "
+              << piece_length << " bytes" << std::endl;
+  }
+  std::cout << "--- PIECE " << piece_index << " DOWNLOAD COMPLETE! ---"
+            << std::endl;
+  return piece_buffer;
 }

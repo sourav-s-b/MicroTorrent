@@ -5,6 +5,7 @@
 #include "utils.hpp"
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
 int main() {
   std::string torrent_path = "debian-13.5.0-amd64-netinst.iso.torrent";
@@ -85,6 +86,36 @@ int main() {
 
       PeerClient worker(peer_io_context, target_ip, target_port, hash, peer_id);
       if (worker.connect_and_handshake()) {
+
+        long long piece_length = std::get<long long>(info_dict["piece length"].data);
+        std::string master_pieces_string = std::get<std::string>(info_dict["pieces"].data);
+
+        std::string expected_hash = master_pieces_string.substr(0, 20);
+
+        std::vector<uint8_t> piece_data = worker.download_piece(0, piece_length);
+
+        if (piece_data.size() == piece_length) {
+            std::cout << " --- Hash Verification --- " << std::endl;
+
+            std::string raw_data_string(piece_data.begin(), piece_data.end());
+            std::string actual_hash = SHA1::hash(raw_data_string);
+
+            if (actual_hash == expected_hash){
+                std::cout << "[>] HASH MATCHES! " << std::endl;
+
+                std::ofstream out_file("debian_verified.iso" , std::ios::binary | std::ios::app);
+                out_file.write(reinterpret_cast<const char*>(piece_data.data()),piece_data.size());
+                out_file.close();
+
+                std::cout << "[>] Successfully Wrote Piece 0 To Disk" << std::endl;
+            }else {
+                std::cerr << "[X] HASH MISMATCH!" << std::endl;
+            }
+        } else {
+            std::cerr << "[X] Download Failed or was incomplete" << std::endl;
+        }
+
+          
         successfull_handshake = true;
         break;
       } else {
