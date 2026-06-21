@@ -1,11 +1,10 @@
 #include "peer.hpp"
 #include "asio/error_code.hpp"
+#include "logger.hpp"
 #include <algorithm>
 #include <cstdint>
 #include <exception>
-#include <fstream>
-#include <iostream>
-#include <stdexcept>
+#include <string>
 #include <vector>
 
 PeerClient::PeerClient(asio::io_context &io_context, const std::string &ip,
@@ -41,19 +40,19 @@ std::vector<uint8_t> PeerClient::build_handshake() {
 
 bool PeerClient::connect_and_handshake() {
   try {
-    std::cout << "\n[Peer " << ip_ << ":" << port_ << "] Connecting..."
-              << std::endl;
+    Logger::info("[Peer " + ip_ + ":" + std::to_string(port_) +
+                 "] Connecting...");
 
     asio::ip::tcp::endpoint target(asio::ip::address::from_string(ip_), port_);
     asio::error_code ec;
 
     ec = socket_.connect(target, ec);
     if (ec) {
-      std::cerr << " -> Connection failed: " << ec.message() << std::endl;
+      Logger::error("Connection failed: " + ec.message());
       return false;
     }
 
-    std::cout << " -> Socket Open. Sending Handshake..." << std::endl;
+    Logger::info("Socket Open. Sending Handshake...");
 
     std::vector<uint8_t> handshake = build_handshake();
     asio::write(socket_, asio::buffer(handshake));
@@ -62,27 +61,24 @@ bool PeerClient::connect_and_handshake() {
 
     asio::read(socket_, asio::buffer(peer_response), ec);
     if (ec) {
-      std::cerr << " -> Handshake failed: " << ec.message() << std::endl;
+      Logger::error("Handshake failed: " + ec.message());
     }
 
     std::string returned_hash(peer_response.begin() + 28,
                               peer_response.begin() + 48);
     if (returned_hash != info_hash_) {
-      std::cerr << " -> SECURITY ALERT: Peer returned mismatched info_hash. "
-                   "Dropping connection."
-                << std::endl;
+      Logger::error("SECURITY ALERT: Peer returned mismatched info_hash : "
+                    "Dropping connection.");
       socket_.close();
       return false;
     }
 
-    std::cout << " -> Success!\nHandshake validated. Securely Linekd"
-              << std::endl;
+    Logger::info("Success! Handshake validated. Securely Linekd");
 
     int msg1 = receive_message(); // for bitfield
     if (msg1 != 5) {
-      std::cout << "  -> Peer didn't send a BITFIELD. They have 0 pieces. "
-                   "Dropping them."
-                << std::endl;
+      Logger::error(
+          "Peer didn't send a BITFIELD. They have 0 pieces : Dropping them.");
       return false;
     }
 
@@ -90,8 +86,7 @@ bool PeerClient::connect_and_handshake() {
 
     int msg2 = receive_message(); // for unchoke
     if (msg2 != 1) {
-      std::cout << "  -> Peer refused to UNCHOKE us. Dropping them."
-                << std::endl;
+      Logger::error("Peer refused to UNCHOKE us. Dropping them.");
       return false;
     }
     return true;
@@ -104,7 +99,7 @@ bool PeerClient::connect_and_handshake() {
 void PeerClient::send_interested() {
   std::vector<uint8_t> msg = {0, 0, 0, 1, 2};
   asio::write(socket_, asio::buffer(msg));
-  std::cout << " -> Sent: Interested" << std::endl;
+  Logger::debug("Sent: Interested");
 }
 
 int PeerClient::receive_message() {
@@ -113,8 +108,7 @@ int PeerClient::receive_message() {
 
   asio::read(socket_, asio::buffer(length_buffer, 4), ec);
   if (ec) {
-    std::cerr << " -> Socket closed while waiting for message length."
-              << std::endl;
+    Logger::error("Socket closed while waiting for message length.");
     return false;
   }
 
@@ -123,32 +117,31 @@ int PeerClient::receive_message() {
                             length_buffer[3];
 
   if (message_length == 0) {
-    std::cout << " <- Received Keep-Alive" << std::endl;
+    Logger::debug("Received Keep-Alive");
     return -1;
   }
 
   std::vector<uint8_t> payload(message_length);
   asio::read(socket_, asio::buffer(payload), ec);
   if (ec) {
-    std::cerr << "  -> Failed to read message payload." << std::endl;
+    Logger::error("Failed to read message payload.");
     return -2;
   }
 
   uint8_t message_id = payload[0];
   switch (message_id) {
   case 0:
-    std::cout << "  <- Received: CHOKE (ID: 0)" << std::endl;
+    Logger::debug("Received: CHOKE (ID: 0)");
     break;
   case 1:
-    std::cout << "  <- Received: UNCHOKE (ID: 1) - We can now request data!"
-              << std::endl;
+    Logger::debug("Received: UNCHOKE (ID: 1) - We can now request data!");
     break;
   case 5:
-    std::cout << "  <- Received: BITFIELD (ID: 5) - Size: "
-              << payload.size() - 1 << " bytes" << std::endl;
+    Logger::debug("Received: BITFIELD (ID: 5) - Size: " +
+                  std::to_string(payload.size() - 1) + " bytes");
     break;
   case 7: {
-    std::cout << "\n Recieved: PIECE " << std::endl;
+    Logger::debug("Recieved: PIECE ");
 
     last_data_buffer_.clear();
 
@@ -157,7 +150,7 @@ int PeerClient::receive_message() {
     break;
   }
   default:
-    std::cout << "  <- Received: Message ID " << (int)message_id << std::endl;
+    Logger::debug("Received: Message ID " + std::to_string(message_id));
     break;
   }
   return message_id;
@@ -183,8 +176,9 @@ void PeerClient::request_block(uint32_t piece_index, uint32_t block_offset,
   push_uint32(request_msg, block_length);
 
   asio::write(socket_, asio::buffer(request_msg));
-  std::cout << "  -> Sent: REQUEST for Piece " << piece_index << " at offset "
-            << block_offset << " (" << block_length << " bytes)" << std::endl;
+  Logger::debug("Sent: REQUEST for Piece " + std::to_string(piece_index) +
+                " at offset " + std::to_string(block_offset) + " (" +
+                std::to_string(block_length) + " bytes)");
 }
 
 std::vector<uint8_t> PeerClient::download_piece(uint32_t piece_index,
@@ -204,28 +198,34 @@ std::vector<uint8_t> PeerClient::download_piece(uint32_t piece_index,
 
     int msg_id;
     while (true) {
-                msg_id = receive_message(); 
-                
-                if (msg_id == 7) {
-                    break; 
-                } 
-                else if (msg_id < 0) {
-                    std::cerr << "  -> Error: Peer disconnected or socket failed." << std::endl;
-                    return {}; 
-                } 
-                else {
-                    std::cout << "     -> Ignoring protocol chatter (ID: " << msg_id << ")..." << std::endl;
-                }
-            }
+      msg_id = receive_message();
+
+      if (msg_id == 7) {
+        break;
+      } else if (msg_id < 0) {
+        Logger::error("Error: Peer disconnected or socket failed.");
+        return {};
+      } else {
+        Logger::debug("Ignoring protocol chatter (ID: " +
+                      std::to_string(msg_id) + ")...");
+      }
+    }
 
     bytes_downloaded += current_block_size;
     piece_buffer.insert(piece_buffer.end(), last_data_buffer_.begin(),
                         last_data_buffer_.end());
 
-    std::cout << "     -> Progress: " << bytes_downloaded << " / "
-              << piece_length << " bytes" << std::endl;
+    Logger::progress("Progress: " + std::to_string(bytes_downloaded) + " / " +
+                     std::to_string(piece_length) + " bytes", LogLevel::INFO);
   }
-  std::cout << "--- PIECE " << piece_index << " DOWNLOAD COMPLETE! ---"
-            << std::endl;
+  Logger::info("PIECE " + std::to_string(piece_index) + " DOWNLOAD COMPLETE!");
   return piece_buffer;
+}
+
+bool PeerClient::has_piece(uint32_t piece_index) const {
+    if (piece_index >= peer_bitfield_.size()) {
+        Logger::error(std::to_string(piece_index) + ": piece index asked from peer is out of bound");
+        return false;
+    }
+    return peer_bitfield_[piece_index];
 }

@@ -21,6 +21,7 @@ FetchContent_MakeAvailable(asio)
 file(GLOB SOURCE_FILES "src/*.cpp")
 
 add_executable(asio_test ${SOURCE_FILES})
+add_compile_definitions(WIN32_LEAN_AND_MEAN NOGDI)
 target_compile_definitions(asio_test PRIVATE _WIN32_WINNT=0x0A00)
 
 target_compile_options(asio_test PRIVATE /EHsc)
