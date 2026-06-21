@@ -56,6 +56,11 @@ int main() {
       peer_list.push_back(pd);
     }
 
+    // Logger::info("Log Check  for peerlist:");
+    // for (PeerData peer : peer_list) {
+    //     Logger::info("Peer : " + peer.to_string());
+    // }
+
     SwarmManager swarm(torrent, peer_list);
     swarm.start_download();
   } catch (const std::exception &e) {
