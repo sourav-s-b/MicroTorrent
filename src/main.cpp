@@ -61,7 +61,7 @@ int main() {
     //     Logger::info("Peer : " + peer.to_string());
     // }
 
-    SwarmManager swarm(torrent, peer_list);
+    SwarmManager swarm(torrent, peer_list, 50);
     swarm.start_download();
   } catch (const std::exception &e) {
     Logger::error("Fatal Error: " + std::string(e.what()));

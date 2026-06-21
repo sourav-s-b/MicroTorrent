@@ -15,7 +15,8 @@ public:
              const std::string &info_hash, const std::string &peer_id,
              SwarmManager &manager);
 
-  int get_active_piece() const {return active_piece_;}
+  int get_active_piece() const { return active_piece_; }
+  std::string get_ip() const { return ip_; }
 
   void start();
   bool has_piece(uint32_t piece_index) const;

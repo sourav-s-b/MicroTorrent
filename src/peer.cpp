@@ -74,14 +74,13 @@ void PeerClient::handle_handshake_read(const asio::error_code &ec,
                             handshake_buffer_.begin() + 48);
 
   if (returned_hash != info_hash_) {
-    Logger::error("[Peer " + ip_ +
-                  "] Mismatched info_hash. Dropping.");
+    Logger::error("[Peer " + ip_ + "] Mismatched info_hash. Dropping.");
     disconnect();
     return;
   }
 
-  Logger::debug("[Peer " + ip_ +
-               "] Handshake validated! Entering infinite event loop.");
+  Logger::info("[Peer " + ip_ +
+                "] Handshake validated! Entering infinite event loop.");
 
   // and so it begins.
   read_message_header();
@@ -132,6 +131,11 @@ void PeerClient::handle_message_payload(const asio::error_code &ec) {
   switch (message_id) {
   case 0: // choke
     Logger::debug("[Peer " + ip_ + "] Recieved Choke.");
+    if (is_busy_) {
+      is_busy_ = false;
+      manager_.requeue_piece(active_piece_);
+      active_piece_ = -1;
+    }
     break;
   case 1: // unchoke
     if (!is_busy_) {
@@ -301,7 +305,7 @@ void PeerClient::disconnect() {
   if (socket_.is_open()) {
     ec = socket_.close(ec);
   }
-  Logger::debug("[Peer " + ip_ + "] Disconnected manually.");
+  Logger::info("[Peer " + ip_ + "] Disconnected manually.");
 
   manager_.handle_disconnect(shared_from_this());
 }
