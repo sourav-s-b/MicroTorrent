@@ -12,7 +12,7 @@
 SwarmManager::SwarmManager(const TorrentFile &torrent,
                            const std::vector<PeerData> &peers,
                            uint32_t num_of_connection)
-    : torrent_(torrent), disk_(torrent_.name), pieces_downloaded_(0),
+    : torrent_(torrent), disk_(torrent_.file_list), pieces_downloaded_(0),
       num_of_connection_(num_of_connection) {
 
   total_pieces_ = (torrent_.total_length + torrent_.piece_length - 1) /
@@ -101,13 +101,18 @@ void SwarmManager::submit_piece(std::shared_ptr<PeerClient> worker,
     Logger::debug("Hash Verfication Matches! and writing piece " +
                   std::to_string(piece_index));
 
-    disk_.write_piece(piece_index, data.size(), data);
-    pieces_downloaded_++;
+    try {
+      disk_.write_piece(piece_index, data.size(), data);
+      pieces_downloaded_++;
 
-    Logger::progress("Swarm Progress: " + std::to_string(pieces_downloaded_) +
-                         " / " + std::to_string(total_pieces_),
-                     LogLevel::INFO);
-
+      Logger::progress("Swarm Progress: " + std::to_string(pieces_downloaded_) +
+                           " / " + std::to_string(total_pieces_),
+                       LogLevel::INFO);
+    } catch (const std::exception &e) {
+      Logger::error("CRITICAL: " + std::string(e.what()));
+      Logger::error("Re-queueing Piece " + std::to_string(piece_index));
+      piece_checklist_[piece_index] = false;
+    }
     request_work(worker);
   } else {
     Logger::error("Hash mismatch! Dropping peer. " + worker->get_ip());
@@ -135,12 +140,12 @@ void SwarmManager::handle_disconnect(std::shared_ptr<PeerClient> worker) {
       if (managed.retry_count >= 5) { //<- retry count.. remeber this is here
         managed.state = PeerState::DEAD;
         Logger::info("[Pool] Peer " + managed.data.ip +
-                      " reached retry limit. Marked as DEAD.");
+                     " reached retry limit. Marked as DEAD.");
       } else {
         managed.state = PeerState::RETRYING;
         Logger::info("[Pool] Peer " + managed.data.ip +
-                      " failed. Re-queued (Attempt " +
-                      std::to_string(managed.retry_count) + "/5).");
+                     " failed. Re-queued (Attempt " +
+                     std::to_string(managed.retry_count) + "/5).");
       }
       break;
     }
