@@ -35,6 +35,7 @@ private:
   uint8_t header_buffer_[4];
   std::vector<uint8_t> payload_buffer_;
   std::vector<bool> peer_bitfield_;
+  bool peer_interested_ = false;
 
   // state tracking
   uint32_t current_piece_index_;

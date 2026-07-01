@@ -80,7 +80,7 @@ void PeerClient::handle_handshake_read(const asio::error_code &ec,
   }
 
   Logger::info("[Peer " + ip_ +
-                "] Handshake validated! Entering infinite event loop.");
+               "] Handshake validated! Entering infinite event loop.");
 
   // and so it begins.
   read_message_header();
@@ -144,6 +144,58 @@ void PeerClient::handle_message_payload(const asio::error_code &ec) {
     }
     break;
 
+  case 2: // interested
+    Logger::debug("[Peer " + ip_ + "] is INTERESTED in our data.");
+    peer_interested_ = true;
+    // TODO: Uploading working to be done.
+    break;
+
+  case 3: // Not interested
+    Logger::debug("[Peer " + ip_ + "] is INTERESTED in our data.");
+    peer_interested_ = false;
+    break;
+  case 4: {
+
+    if (payload_buffer_.size() < 5)
+      break;
+
+    uint32_t piece_index = (payload_buffer_[1] << 24) |
+                           (payload_buffer_[2] << 16) |
+                           (payload_buffer_[3] << 8) | payload_buffer_[4];
+
+    Logger::debug("[Peer " + ip_ + "] HAVE Piece " +
+                  std::to_string(piece_index));
+
+    if (piece_index < peer_bitfield_.size()) {
+      peer_bitfield_.resize(piece_index + 1, false);
+      peer_bitfield_[piece_index] = true;
+    }
+
+    send_interested();
+    break;
+  }
+  case 6: { // request
+    if (payload_buffer_.size() < 13)
+      break;
+
+    uint32_t req_index = (payload_buffer_[1] << 24) |
+                         (payload_buffer_[2] << 16) |
+                         (payload_buffer_[3] << 8) | payload_buffer_[4];
+    uint32_t req_offset = (payload_buffer_[5] << 24) |
+                          (payload_buffer_[6] << 16) |
+                          (payload_buffer_[7] << 8) | payload_buffer_[8];
+    uint32_t req_length = (payload_buffer_[9] << 24) |
+                          (payload_buffer_[10] << 16) |
+                          (payload_buffer_[11] << 8) | payload_buffer_[12];
+
+    Logger::debug("[Peer " + ip_ + "] REQUESTED Piece " +
+                  std::to_string(req_index) + " at offset " +
+                  std::to_string(req_offset));
+
+    // TODO: Must seed
+
+    break;
+  }
   case 5: { // bitfield
     peer_bitfield_.clear();
     for (size_t i = 1; i < payload_buffer_.size(); ++i) {
@@ -195,6 +247,10 @@ void PeerClient::handle_message_payload(const asio::error_code &ec) {
       request_next_block();
     }
     break;
+  }
+  case 8: { // cancel
+      Logger::debug("[Peer " + ip_ + "] Cancelled their request.");
+      break;
   }
   }
 
