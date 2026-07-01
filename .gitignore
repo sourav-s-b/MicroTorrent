@@ -36,3 +36,5 @@ desktop.ini
 
 *.torrent
 *.iso
+
+*.ignore.txt

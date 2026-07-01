@@ -3,12 +3,14 @@ project(MicroTorrent CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17")
+    add_compile_definitions(WIN32_LEAN_AND_MEAN NOGDI _WIN32_WINNT=0x0A00)
+    add_compile_options(/EHsc)
 endif()
+
 
 include(FetchContent)
 FetchContent_Declare(
@@ -18,16 +20,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(asio)
 
-file(GLOB SOURCE_FILES "src/*.cpp")
-
-add_executable(asio_test ${SOURCE_FILES})
-add_compile_definitions(WIN32_LEAN_AND_MEAN NOGDI)
-target_compile_definitions(asio_test PRIVATE _WIN32_WINNT=0x0A00)
-
-target_compile_options(asio_test PRIVATE /EHsc)
-
-target_include_directories(asio_test PRIVATE
-    include
-    ${asio_SOURCE_DIR}/asio/include
-)
-target_compile_definitions(asio_test PRIVATE ASIO_STANDALONE)
+# Add the modular sub-projects
+add_subdirectory(engine)
+add_subdirectory(cli)
