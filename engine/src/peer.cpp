@@ -235,22 +235,23 @@ void PeerClient::handle_message_payload(const asio::error_code &ec) {
       bytes_downloaded_ += block_length;
     }
 
+    request_next_block();
+
     if (bytes_downloaded_ >= current_piece_length_) {
       is_busy_ = false;
       active_piece_ = -1;
+      bytes_requested_ = 0;
       Logger::debug("[Peer " + ip_ + "] Piece " +
                     std::to_string(current_piece_index_) +
                     " fully downloaded!");
       manager_.submit_piece(shared_from_this(), current_piece_index_,
                             current_piece_buffer_);
-    } else {
-      request_next_block();
     }
     break;
   }
   case 8: { // cancel
-      Logger::debug("[Peer " + ip_ + "] Cancelled their request.");
-      break;
+    Logger::debug("[Peer " + ip_ + "] Cancelled their request.");
+    break;
   }
   }
 
@@ -341,19 +342,23 @@ void PeerClient::fetch_piece_async(uint32_t piece_index,
   Logger::debug("[Peer " + ip_ + "] Starting async fetch for Piece " +
                 std::to_string(piece_index));
 
-  request_next_block();
+  for (uint32_t i = 0; i < MAX_BLOCK_WINDOW; ++i) {
+    request_next_block();
+  }
 }
 
 void PeerClient::request_next_block() {
-  if (bytes_downloaded_ >= current_piece_length_)
+  if (bytes_requested_ >= current_piece_length_)
     return;
 
   const uint32_t MAX_BLOCK_LENGTH = 16 * 1024;
   uint32_t current_block_size =
       std::min(MAX_BLOCK_LENGTH,
-               current_piece_length_ - bytes_downloaded_); // for last piece
+               current_piece_length_ - bytes_requested_); // for last piece
 
-  request_block(current_piece_index_, bytes_downloaded_, current_block_size);
+  request_block(current_piece_index_, bytes_requested_, current_block_size);
+
+  bytes_requested_ += current_block_size;
 }
 
 void PeerClient::disconnect() {

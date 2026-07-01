@@ -44,6 +44,7 @@ private:
   std::vector<uint8_t> current_piece_buffer_;
   bool is_busy_ = false;
   int active_piece_ = -1;
+  uint32_t bytes_requested_ = 0;
 
   // the initial helpers
   void handle_connect(const asio::error_code &ec);
@@ -63,4 +64,6 @@ private:
                      uint32_t block_length);
   void push_uint32(std::vector<uint8_t> &vec, uint32_t val);
   void request_next_block();
+
+  const uint32_t MAX_BLOCK_WINDOW = 7;
 };
