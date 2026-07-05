@@ -10,6 +10,7 @@
 int main() {
 
   Logger::current_level = LogLevel::INFO;
+  Logger::disable_channel(LogChannel::MESSAGE);
   std::string torrent_path = "debian-13.5.0-amd64-netinst.iso.torrent";
   try {
 
@@ -27,7 +28,7 @@ int main() {
     }
 
     std::string body = response.substr(header_end + 4);
-
+    Logger::debug("Response Arrived");
     size_t parse_index = 0;
     BencodeNode tracker_node = parse_bencode(body, parse_index);
     BencodeDict tracker_dict = std::get<BencodeDict>(tracker_node.data);
@@ -55,11 +56,6 @@ int main() {
 
       peer_list.push_back(pd);
     }
-
-    // Logger::info("Log Check  for peerlist:");
-    // for (PeerData peer : peer_list) {
-    //     Logger::info("Peer : " + peer.to_string());
-    // }
 
     SwarmManager swarm(torrent, peer_list, 50);
     swarm.start_download();

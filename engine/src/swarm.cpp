@@ -85,7 +85,7 @@ void SwarmManager::request_work(std::shared_ptr<PeerClient> worker) {
     }
 
     Logger::debug("Delegating Piece " + std::to_string(piece_to_download) +
-                  " to Peer." + worker->get_ip());
+                  " to Peer." + worker->get_ip() , LogChannel::SWARM);
 
     worker->fetch_piece_async(piece_to_download, current_piece_length);
   }
@@ -99,7 +99,7 @@ void SwarmManager::submit_piece(std::shared_ptr<PeerClient> worker,
 
   if (SHA1::hash(raw_data_string) == expected_hash) {
     Logger::debug("Hash Verfication Matches! and writing piece " +
-                  std::to_string(piece_index));
+                  std::to_string(piece_index) , LogChannel::SWARM);
 
     try {
       disk_.write_piece(piece_index, data.size(), data);
@@ -122,10 +122,10 @@ void SwarmManager::submit_piece(std::shared_ptr<PeerClient> worker,
 }
 
 void SwarmManager::handle_disconnect(std::shared_ptr<PeerClient> worker) {
-  uint32_t active = worker->get_active_piece();
+  int32_t active = worker->get_active_piece();
   if (active != -1) {
     Logger::debug("Peer dropped " + worker->get_ip() + " while holding Piece " +
-                  std::to_string(active) + ". Re-queueing.");
+                  std::to_string(active) + ". Re-queueing.", LogChannel::SWARM);
     piece_checklist_[active] = false;
   }
 
@@ -139,13 +139,13 @@ void SwarmManager::handle_disconnect(std::shared_ptr<PeerClient> worker) {
 
       if (managed.retry_count >= 5) { //<- retry count.. remeber this is here
         managed.state = PeerState::DEAD;
-        Logger::info("[Pool] Peer " + managed.data.ip +
-                     " reached retry limit. Marked as DEAD.");
+        Logger::debug("[Pool] Peer " + managed.data.ip +
+                     " reached retry limit. Marked as DEAD.", LogChannel::SWARM);
       } else {
         managed.state = PeerState::RETRYING;
-        Logger::info("[Pool] Peer " + managed.data.ip +
+        Logger::debug("[Pool] Peer " + managed.data.ip +
                      " failed. Re-queued (Attempt " +
-                     std::to_string(managed.retry_count) + "/5).");
+                     std::to_string(managed.retry_count) + "/5).", LogChannel::SWARM);
       }
       break;
     }
@@ -158,6 +158,7 @@ void SwarmManager::maintain_swarm_strength() {
     return;
 
   int slots_available = num_of_connection_ - active_workers_.size();
+  std::vector<std::shared_ptr<PeerClient>> to_start;
 
   if (slots_available <= 0)
     return;
@@ -175,9 +176,12 @@ void SwarmManager::maintain_swarm_strength() {
           "-MT0001-174094882455", *this);
 
       active_workers_.push_back(worker);
-      worker->start();
+      to_start.push_back(worker);
       slots_available--;
     }
+  }
+  for (auto worker: to_start) {
+      worker->start();
   }
 }
 
@@ -185,6 +189,6 @@ void SwarmManager::requeue_piece(int piece_index) {
   if (piece_index != -1) {
     piece_checklist_[piece_index] = false;
     Logger::debug("Piece " + std::to_string(piece_index) +
-                  " requeued to swarm.");
+                  " requeued to swarm.", LogChannel::SWARM);
   }
 }

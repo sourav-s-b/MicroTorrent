@@ -33,7 +33,7 @@ std::string TrackerClient::announce(const std::string &announce_url,
   }
 
   Logger::info("Initialing Tracker Connection");
-  Logger::debug("Target Host: " + host + " | Port: " + port);
+  Logger::debug("Target Host: " + host + " | Port: " + port , LogChannel::TRACKER);
 
   asio::io_context io_context;
 
@@ -68,11 +68,11 @@ std::string TrackerClient::announce(const std::string &announce_url,
     request_stream << "\r\n";
 
     std::string full_request = request_stream.str();
-    Logger::info("Sending HTTP Request");
+    Logger::info("Sending HTTP Request", LogChannel::TRACKER);
     Logger::debug(full_request);
 
     asio::write(socket, asio::buffer(full_request));
-    Logger::info("Request transmitted. Awaiting response");
+    Logger::info("Request transmitted. Awaiting response", LogChannel::TRACKER);
 
     char read_buffer[4096];
     asio::error_code ec;

@@ -19,7 +19,7 @@ PeerClient::PeerClient(asio::io_context &io_context, const std::string &ip,
 }
 
 void PeerClient::start() {
-  Logger::debug("[Peer " + ip_ + "] Initialising Connection");
+  Logger::debug("[Peer " + ip_ + "] Initialising Connection", LogChannel::PEER);
 
   socket_.async_connect(target_endpoint_, [self = shared_from_this()](
                                               const asio::error_code &ec) {
@@ -31,20 +31,19 @@ void PeerClient::start() {
 
 void PeerClient::handle_connect(const asio::error_code &ec) {
   if (ec) {
-    Logger::debug("[Peer " + ip_ + "] Connection failed: " + ec.message());
+    Logger::debug("[Peer " + ip_ + "] Connection failed: " + ec.message(),
+                  LogChannel::PEER);
     disconnect();
     return;
   }
 
-  Logger::debug("[Peer " + ip_ + "] Socket Open. Writing Handshake...");
+  Logger::debug("[Peer " + ip_ + "] Socket Open. Writing Handshake...",
+                LogChannel::PEER);
 
   std::vector<uint8_t> handshake = build_handshake();
 
-  asio::async_write(
-      socket_, asio::buffer(handshake),
-      [self = shared_from_this()](const asio::error_code &ec, size_t) {
-        self->handle_handshake_written(ec);
-      });
+  asio::write(socket_, asio::buffer(handshake));
+  handle_handshake_written(asio::error_code{});
 }
 
 // the actual helpers
@@ -65,7 +64,7 @@ void PeerClient::handle_handshake_written(const asio::error_code &ec) {
 void PeerClient::handle_handshake_read(const asio::error_code &ec,
                                        size_t bytes_transferred) {
   if (ec || bytes_transferred != 68) {
-    Logger::debug("[Peer " + ip_ + "] Handshake failed.");
+    Logger::debug("[Peer " + ip_ + "] Handshake failed.", LogChannel::PEER);
     disconnect();
     return;
   }
@@ -79,8 +78,9 @@ void PeerClient::handle_handshake_read(const asio::error_code &ec,
     return;
   }
 
-  Logger::info("[Peer " + ip_ +
-               "] Handshake validated! Entering infinite event loop.");
+  Logger::debug("[Peer " + ip_ +
+                    "] Handshake validated! Entering infinite event loop.",
+                LogChannel::PEER);
 
   // and so it begins.
   read_message_header();
@@ -97,7 +97,8 @@ void PeerClient::read_message_header() {
 
 void PeerClient::handle_message_header(const asio::error_code &ec) {
   if (ec) {
-    Logger::debug("[Peer " + ip_ + "] Socket closed or network error.");
+    Logger::debug("[Peer " + ip_ + "] Socket closed or network error.",
+                  LogChannel::PEER);
     disconnect();
     return;
   }
@@ -130,7 +131,7 @@ void PeerClient::handle_message_payload(const asio::error_code &ec) {
 
   switch (message_id) {
   case 0: // choke
-    Logger::debug("[Peer " + ip_ + "] Recieved Choke.");
+    Logger::debug("[Peer " + ip_ + "] Recieved Choke.", LogChannel::MESSAGE);
     if (is_busy_) {
       is_busy_ = false;
       manager_.requeue_piece(active_piece_);
@@ -139,19 +140,22 @@ void PeerClient::handle_message_payload(const asio::error_code &ec) {
     break;
   case 1: // unchoke
     if (!is_busy_) {
-      Logger::debug("[Peer " + ip_ + "] Recieved Unchoke.");
+      Logger::debug("[Peer " + ip_ + "] Recieved Unchoke.",
+                    LogChannel::MESSAGE);
       manager_.request_work(shared_from_this());
     }
     break;
 
   case 2: // interested
-    Logger::debug("[Peer " + ip_ + "] is INTERESTED in our data.");
+    Logger::debug("[Peer " + ip_ + "] is INTERESTED in our data.",
+                  LogChannel::MESSAGE);
     peer_interested_ = true;
     // TODO: Uploading working to be done.
     break;
 
   case 3: // Not interested
-    Logger::debug("[Peer " + ip_ + "] is INTERESTED in our data.");
+    Logger::debug("[Peer " + ip_ + "] is INTERESTED in our data.",
+                  LogChannel::MESSAGE);
     peer_interested_ = false;
     break;
   case 4: {
@@ -164,7 +168,8 @@ void PeerClient::handle_message_payload(const asio::error_code &ec) {
                            (payload_buffer_[3] << 8) | payload_buffer_[4];
 
     Logger::debug("[Peer " + ip_ + "] HAVE Piece " +
-                  std::to_string(piece_index));
+                      std::to_string(piece_index),
+                  LogChannel::MESSAGE);
 
     if (piece_index < peer_bitfield_.size()) {
       peer_bitfield_.resize(piece_index + 1, false);
@@ -189,8 +194,9 @@ void PeerClient::handle_message_payload(const asio::error_code &ec) {
                           (payload_buffer_[11] << 8) | payload_buffer_[12];
 
     Logger::debug("[Peer " + ip_ + "] REQUESTED Piece " +
-                  std::to_string(req_index) + " at offset " +
-                  std::to_string(req_offset));
+                      std::to_string(req_index) + " at offset " +
+                      std::to_string(req_offset),
+                  LogChannel::MESSAGE);
 
     // TODO: Must seed
 
@@ -204,13 +210,14 @@ void PeerClient::handle_message_payload(const asio::error_code &ec) {
         peer_bitfield_.push_back((current_byte >> bit) & 1);
       }
     }
-    Logger::debug("[Peer " + ip_ + "] Bitfield Received.");
+    Logger::debug("[Peer " + ip_ + "] Bitfield Received.", LogChannel::MESSAGE);
 
     send_interested();
     break;
   }
   case 7: { // PIECE DATA
-    Logger::debug("[Peer " + ip_ + "] Received Piece Data");
+    Logger::debug("[Peer " + ip_ + "] Received Piece Data",
+                  LogChannel::MESSAGE);
 
     if (payload_buffer_.size() <= 9)
       break;
@@ -242,15 +249,17 @@ void PeerClient::handle_message_payload(const asio::error_code &ec) {
       active_piece_ = -1;
       bytes_requested_ = 0;
       Logger::debug("[Peer " + ip_ + "] Piece " +
-                    std::to_string(current_piece_index_) +
-                    " fully downloaded!");
+                        std::to_string(current_piece_index_) +
+                        " fully downloaded!",
+                    LogChannel::PEER);
       manager_.submit_piece(shared_from_this(), current_piece_index_,
                             current_piece_buffer_);
     }
     break;
   }
   case 8: { // cancel
-    Logger::debug("[Peer " + ip_ + "] Cancelled their request.");
+    Logger::debug("[Peer " + ip_ + "] Cancelled their request.",
+                  LogChannel::MESSAGE);
     break;
   }
   }
@@ -289,7 +298,8 @@ void PeerClient::send_interested() {
       socket_, asio::buffer(*msg),
       [self = shared_from_this(), msg](const asio::error_code &ec, size_t) {
         if (!ec)
-          Logger::debug("[Peer " + self->ip_ + "] Sent INTERESTED.");
+          Logger::debug("[WE: " + self->ip_ + "] Sent INTERESTED.",
+                        LogChannel::MESSAGE);
       });
 }
 
@@ -312,10 +322,17 @@ void PeerClient::request_block(uint32_t piece_index, uint32_t block_offset,
   push_uint32(request_msg, block_offset);
   push_uint32(request_msg, block_length);
 
-  asio::write(socket_, asio::buffer(request_msg));
+  auto buf = asio::buffer(request_msg);
+  asio::async_write(socket_, buf,
+                    [self = shared_from_this(),
+                     request_msg](const asio::error_code &ec, size_t) {
+                      if (ec)
+                        self->disconnect();
+                    });
   Logger::debug("Sent: REQUEST for Piece " + std::to_string(piece_index) +
-                " at offset " + std::to_string(block_offset) + " (" +
-                std::to_string(block_length) + " bytes)");
+                    " at offset " + std::to_string(block_offset) + " (" +
+                    std::to_string(block_length) + " bytes)",
+                LogChannel::MESSAGE);
 }
 
 bool PeerClient::has_piece(uint32_t piece_index) const {
@@ -340,7 +357,8 @@ void PeerClient::fetch_piece_async(uint32_t piece_index,
   current_piece_buffer_.assign(piece_length, 0);
 
   Logger::debug("[Peer " + ip_ + "] Starting async fetch for Piece " +
-                std::to_string(piece_index));
+                    std::to_string(piece_index),
+                LogChannel::MESSAGE);
 
   for (uint32_t i = 0; i < MAX_BLOCK_WINDOW; ++i) {
     request_next_block();
@@ -366,7 +384,7 @@ void PeerClient::disconnect() {
   if (socket_.is_open()) {
     ec = socket_.close(ec);
   }
-  Logger::info("[Peer " + ip_ + "] Disconnected manually.");
+  Logger::debug("[Peer " + ip_ + "] Disconnected manually.", LogChannel::PEER);
 
   manager_.handle_disconnect(shared_from_this());
 }

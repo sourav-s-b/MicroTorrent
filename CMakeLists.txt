@@ -23,3 +23,4 @@ FetchContent_MakeAvailable(asio)
 # Add the modular sub-projects
 add_subdirectory(engine)
 add_subdirectory(cli)
+add_subdirectory(ui)

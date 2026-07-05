@@ -19,17 +19,18 @@ struct PeerData {
   std::string to_string() const { return ip + ":" + std::to_string(port); }
 };
 
-enum class PeerState {UNTOUCHED , CONNECTING , ACTIVE, RETRYING , DEAD};
+enum class PeerState { UNTOUCHED, CONNECTING, ACTIVE, RETRYING, DEAD };
 
 struct ManagedPeer {
-    PeerData data;
-    PeerState state = PeerState::UNTOUCHED;
-    int retry_count = 0;
+  PeerData data;
+  PeerState state = PeerState::UNTOUCHED;
+  int retry_count = 0;
 };
 
 class SwarmManager {
 public:
-  SwarmManager(const TorrentFile &torrent, const std::vector<PeerData> &peers, uint32_t num_of_connection);
+  SwarmManager(const TorrentFile &torrent, const std::vector<PeerData> &peers,
+               uint32_t num_of_connection);
 
   void start_download();
 
@@ -42,12 +43,13 @@ public:
 
   void requeue_piece(int piece_index);
 
+
+
 private:
   TorrentFile torrent_;
   std::vector<ManagedPeer> peer_pool_;
   FileManager disk_;
   uint32_t num_of_connection_;
-
 
   asio::io_context io_context_;
 
@@ -60,4 +62,5 @@ private:
   bool is_download_complete() const;
   int get_next_missing_piece(const PeerClient &worker) const;
   void maintain_swarm_strength();
+
 };

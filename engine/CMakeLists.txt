@@ -3,7 +3,8 @@ file(GLOB ENGINE_SOURCES "src/*.cpp")
 add_library(torrent_engine STATIC ${ENGINE_SOURCES})
 
 target_include_directories(torrent_engine PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
     ${asio_SOURCE_DIR}/asio/include
 )
 

@@ -135,13 +135,13 @@ std::string encode_bencode(const BencodeNode& node) {
             res += encode_bencode(item);
         }
         res += "e";
-        return res; 
+        return res;
     } else if (std::holds_alternative<BencodeDict>(node.data)) {
         std::string res = "d";
         for (const auto& [key, val] : std::get<BencodeDict>(node.data)) {
             res += std::to_string(key.length()) + ":" + key;
             res += encode_bencode(val);
-        }        
+        }
         res += "e";
         return res;
     }

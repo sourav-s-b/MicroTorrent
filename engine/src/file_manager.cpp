@@ -27,7 +27,7 @@ void FileManager::write_piece(uint32_t piece_index, uint32_t piece_length,
 
   std::lock_guard<std::mutex> lock(file_mutex_);
 
-  Logger::debug("Disk locked for writing Piece " + std::to_string(piece_index));
+  Logger::debug("Disk locked for writing Piece " + std::to_string(piece_index) , LogChannel::DISK);
 
   uint64_t global_piece_start =
       static_cast<uint64_t>(piece_index) * piece_length;
@@ -68,5 +68,5 @@ void FileManager::write_piece(uint32_t piece_index, uint32_t piece_length,
       }
     }
   }
-  Logger::debug("Disk write complete. Unlocking.");
+  Logger::debug("Disk write complete. Unlocking." , LogChannel::DISK);
 }
