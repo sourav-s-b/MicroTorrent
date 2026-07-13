@@ -35,6 +35,34 @@ SwarmManager::SwarmManager(const TorrentFile &torrent,
                " | Total Pieces required: " + std::to_string(total_pieces_));
 }
 
+void SwarmManager::init(const TorrentFile &torrent,
+                        const std::vector<PeerData> &peers,
+                        uint32_t num_of_connection) {
+  this->torrent_ = torrent;
+  this->num_of_connection_ = num_of_connection;
+  this->pieces_downloaded_ = 0;
+  this->disk_.init(torrent_.file_list);
+
+  this->total_pieces_ = (torrent_.total_length + torrent_.piece_length - 1) /
+                        torrent_.piece_length; // cheeky technique
+
+  this->piece_checklist_.assign(total_pieces_, false);
+
+  for (const auto &peer_data : peers) {
+    ManagedPeer mp;
+    mp.data = peer_data;
+    mp.state = PeerState::UNTOUCHED;
+    mp.retry_count = 0;
+    peer_pool_.push_back(mp);
+  }
+
+  Logger::info("Swarm Manager Initialized");
+  Logger::info("Target File Size: " + std::to_string(torrent_.total_length) +
+               " bytes | " +
+               "Available Peers: " + std::to_string(peers.size()) +
+               " | Total Pieces required: " + std::to_string(total_pieces_));
+}
+
 bool SwarmManager::is_download_complete() const {
   return pieces_downloaded_ == total_pieces_;
 }
@@ -58,6 +86,11 @@ void SwarmManager::start_download() {
 
   if (is_download_complete()) {
     Logger::info("DOWNLOAD COMPLETE.");
+    io_context_.stop();
+
+    for (auto worker : active_workers_) {
+      handle_disconnect(worker);
+    }
   } else {
     Logger::error(
         "SWARM DEPLETED: Event loop exited, but download is stuck at " +
@@ -85,7 +118,8 @@ void SwarmManager::request_work(std::shared_ptr<PeerClient> worker) {
     }
 
     Logger::debug("Delegating Piece " + std::to_string(piece_to_download) +
-                  " to Peer." + worker->get_ip() , LogChannel::SWARM);
+                      " to Peer." + worker->get_ip(),
+                  LogChannel::SWARM);
 
     worker->fetch_piece_async(piece_to_download, current_piece_length);
   }
@@ -99,7 +133,8 @@ void SwarmManager::submit_piece(std::shared_ptr<PeerClient> worker,
 
   if (SHA1::hash(raw_data_string) == expected_hash) {
     Logger::debug("Hash Verfication Matches! and writing piece " +
-                  std::to_string(piece_index) , LogChannel::SWARM);
+                      std::to_string(piece_index),
+                  LogChannel::SWARM);
 
     try {
       disk_.write_piece(piece_index, data.size(), data);
@@ -125,7 +160,8 @@ void SwarmManager::handle_disconnect(std::shared_ptr<PeerClient> worker) {
   int32_t active = worker->get_active_piece();
   if (active != -1) {
     Logger::debug("Peer dropped " + worker->get_ip() + " while holding Piece " +
-                  std::to_string(active) + ". Re-queueing.", LogChannel::SWARM);
+                      std::to_string(active) + ". Re-queueing.",
+                  LogChannel::SWARM);
     piece_checklist_[active] = false;
   }
 
@@ -140,12 +176,14 @@ void SwarmManager::handle_disconnect(std::shared_ptr<PeerClient> worker) {
       if (managed.retry_count >= 5) { //<- retry count.. remeber this is here
         managed.state = PeerState::DEAD;
         Logger::debug("[Pool] Peer " + managed.data.ip +
-                     " reached retry limit. Marked as DEAD.", LogChannel::SWARM);
+                          " reached retry limit. Marked as DEAD.",
+                      LogChannel::SWARM);
       } else {
         managed.state = PeerState::RETRYING;
         Logger::debug("[Pool] Peer " + managed.data.ip +
-                     " failed. Re-queued (Attempt " +
-                     std::to_string(managed.retry_count) + "/5).", LogChannel::SWARM);
+                          " failed. Re-queued (Attempt " +
+                          std::to_string(managed.retry_count) + "/5).",
+                      LogChannel::SWARM);
       }
       break;
     }
@@ -180,8 +218,8 @@ void SwarmManager::maintain_swarm_strength() {
       slots_available--;
     }
   }
-  for (auto worker: to_start) {
-      worker->start();
+  for (auto worker : to_start) {
+    worker->start();
   }
 }
 
@@ -189,6 +227,21 @@ void SwarmManager::requeue_piece(int piece_index) {
   if (piece_index != -1) {
     piece_checklist_[piece_index] = false;
     Logger::debug("Piece " + std::to_string(piece_index) +
-                  " requeued to swarm.", LogChannel::SWARM);
+                      " requeued to swarm.",
+                  LogChannel::SWARM);
   }
+}
+
+SwarmState SwarmManager::get_stats() {
+  SwarmState state;
+  state.active_peers =
+      std::count_if(active_workers_.begin(), active_workers_.end(),
+                    [](const std::shared_ptr<PeerClient> &worker) {
+                      return worker->is_actively_downloading();
+                    });
+  state.pool_size = peer_pool_.size();
+  state.downloaded_pieces = pieces_downloaded_;
+  state.total_pieces = total_pieces_;
+  state.torrent_name = torrent_.name;
+  return state;
 }

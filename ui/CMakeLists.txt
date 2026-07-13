@@ -7,7 +7,7 @@ FetchContent_Declare(ftxui
 )
 FetchContent_MakeAvailable(ftxui)
 
-file(GLOB UI_SOURCES "src/*.cpp")
+file(GLOB_RECURSE UI_SOURCES "src/*.cpp")
 
 add_executable(app ${UI_SOURCES})
 

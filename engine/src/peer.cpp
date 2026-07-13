@@ -388,3 +388,7 @@ void PeerClient::disconnect() {
 
   manager_.handle_disconnect(shared_from_this());
 }
+
+bool PeerClient::is_actively_downloading() const {
+    return socket_.is_open() && is_busy_ && active_piece_ != -1;
+}

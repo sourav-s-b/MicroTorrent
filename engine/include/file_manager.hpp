@@ -7,12 +7,15 @@
 
 class FileManager {
 public:
-  FileManager(const std::vector<FileEntry>& files);
+  FileManager() = default;
+  FileManager(const std::vector<FileEntry> &files);
+  void init(const std::vector<FileEntry> &files);
   ~FileManager() = default;
 
-  void write_piece(uint32_t piece_index, uint32_t piece_length, const std::vector<uint8_t>& data);
+  void write_piece(uint32_t piece_index, uint32_t piece_length,
+                   const std::vector<uint8_t> &data);
 
 private:
-    std::vector<FileEntry> files_;
-    std::mutex file_mutex_;
+  std::vector<FileEntry> files_;
+  std::mutex file_mutex_;
 };

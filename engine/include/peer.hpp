@@ -21,6 +21,7 @@ public:
   void start();
   bool has_piece(uint32_t piece_index) const;
   void fetch_piece_async(uint32_t piece_index, uint32_t piece_length);
+  bool is_actively_downloading() const;
   void disconnect();
 
 private:

@@ -12,6 +12,7 @@ struct FileEntry {
 
 class TorrentFile {
 public:
+  TorrentFile() = default;
   TorrentFile(const std::string &filepath);
   std::string get_hash_for_piece(uint32_t piece_index) const;
 

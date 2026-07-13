@@ -27,10 +27,22 @@ struct ManagedPeer {
   int retry_count = 0;
 };
 
+struct SwarmState {
+  std::string torrent_name = "";
+  uint32_t total_pieces = 0;
+  uint32_t downloaded_pieces = 0;
+  uint32_t pool_size = 0;
+  uint32_t active_peers = 0;
+};
+
 class SwarmManager {
 public:
+  SwarmManager() = default;
   SwarmManager(const TorrentFile &torrent, const std::vector<PeerData> &peers,
                uint32_t num_of_connection);
+
+  void init(const TorrentFile &torrent, const std::vector<PeerData> &peers,
+            uint32_t num_of_connection);
 
   void start_download();
 
@@ -43,7 +55,7 @@ public:
 
   void requeue_piece(int piece_index);
 
-
+  SwarmState get_stats();
 
 private:
   TorrentFile torrent_;
@@ -62,5 +74,4 @@ private:
   bool is_download_complete() const;
   int get_next_missing_piece(const PeerClient &worker) const;
   void maintain_swarm_strength();
-
 };

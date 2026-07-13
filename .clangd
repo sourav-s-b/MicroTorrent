@@ -10,6 +10,8 @@ CompileFlags:
     - "/Z*"
     - "/MD*"
     - "-MD*"
+    - "-external:*"
+    - "/external:*"
   Add:
     - "-std=c++17"
     - "-DASIO_STANDALONE"

@@ -22,12 +22,27 @@ FileManager::FileManager(const std::vector<FileEntry> &files) : files_(files) {
   }
 }
 
+void FileManager::init(const std::vector<FileEntry> &files) {
+  this->files_ = files;
+  for (const auto &file : files) {
+    std::filesystem::path p(file.path);
+
+    if (p.has_parent_path()) {
+      std::filesystem::create_directories(p.parent_path());
+    }
+
+    std::ofstream init(file.path, std::ios::binary | std::ios::app);
+    init.close();
+  }
+}
+
 void FileManager::write_piece(uint32_t piece_index, uint32_t piece_length,
                               const std::vector<uint8_t> &data) {
 
   std::lock_guard<std::mutex> lock(file_mutex_);
 
-  Logger::debug("Disk locked for writing Piece " + std::to_string(piece_index) , LogChannel::DISK);
+  Logger::debug("Disk locked for writing Piece " + std::to_string(piece_index),
+                LogChannel::DISK);
 
   uint64_t global_piece_start =
       static_cast<uint64_t>(piece_index) * piece_length;
@@ -68,5 +83,5 @@ void FileManager::write_piece(uint32_t piece_index, uint32_t piece_length,
       }
     }
   }
-  Logger::debug("Disk write complete. Unlocking." , LogChannel::DISK);
+  Logger::debug("Disk write complete. Unlocking.", LogChannel::DISK);
 }
