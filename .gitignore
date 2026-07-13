@@ -38,3 +38,4 @@ desktop.ini
 *.iso
 
 *.ignore.txt
+compile_commands.json
