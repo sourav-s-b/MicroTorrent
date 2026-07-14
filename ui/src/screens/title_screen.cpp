@@ -20,14 +20,17 @@ void TitleScreen::build_ui() {
 
   InputOption input_options;
   input_options.on_enter = [this] { validate_input(); };
-  input_options.transform = [this](InputState state) {
+  input_options.transform = [](InputState state) {
     Element e = state.element | bgcolor(Color::Default);
     return e;
   };
 
   input_component_ = Input(&file_path_, "Torrent Path..", input_options);
 
-  main_layout_ = Renderer(input_component_, [&] {
+  auto container = Container::Vertical({
+          input_component_
+      });
+  main_layout_ = Renderer(container, [&] {
     return vbox({LOGO_ASCI,
 
                  hbox({input_component_->Render() | flex}) | border,
@@ -46,23 +49,24 @@ void TitleScreen::set_error(std::string msg) {
 }
 
 void TitleScreen::validate_input() {
-  error_message_ = "";
+    error_message_ = "";
 
-  if (!file_path_.empty() && file_path_.back() == '\n') {
-      file_path_.pop_back();
+    // Clean up paths pasted from terminal frames (e.g. carriage returns)
+    if (!file_path_.empty() && (file_path_.back() == '\n' || file_path_.back() == '\r')) {
+        file_path_.pop_back();
     }
 
-  if (file_path_.empty()) {
-    error_message_ = "Error: Path cannot be empty.";
-    return;
-  }
-  if (file_path_.length() <= 8 || file_path_.compare(file_path_.length() - 8, 8 , ".torrent") != 0 ) {
-      error_message_ = "Error: Not a valid path";
-      return;
-  }
+    if (file_path_.empty()) {
+        error_message_ = "Error: Path cannot be empty.";
+        return;
+    }
 
-  if (on_engine_provided_) {
-      on_engine_provided_(file_path_);
-  }
+    if (file_path_.length() <= 8 || file_path_.compare(file_path_.length() - 8, 8 , ".torrent") != 0 ) {
+        error_message_ = "Error: Not a valid .torrent file path";
+        return;
+    }
 
+    if (on_engine_provided_) {
+        on_engine_provided_(file_path_);
+    }
 }

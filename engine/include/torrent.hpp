@@ -17,6 +17,7 @@ public:
   std::string get_hash_for_piece(uint32_t piece_index) const;
 
   std::string announce_url;
+  std::vector<std::string> announce_list;
   std::string info_hash;
   long long total_length;
   long long piece_length;

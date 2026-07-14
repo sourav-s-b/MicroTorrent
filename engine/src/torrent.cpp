@@ -4,6 +4,7 @@
 #include "utils.hpp"
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 TorrentFile::TorrentFile(const std::string &filepath) {
   Logger::info("Loading torrent file " + filepath);
@@ -14,9 +15,22 @@ TorrentFile::TorrentFile(const std::string &filepath) {
   BencodeNode root = parse_bencode(file_buffer, index);
   BencodeDict torrent_info = std::get<BencodeDict>(root.data);
 
-  announce_url =
-      std::get<std::string>(torrent_info.at("announce").data);
+  announce_url = std::get<std::string>(torrent_info.at("announce").data);
 
+  if (torrent_info.count("announce-list")) {
+    // 1. Get the outer vector of BencodeNodes
+    auto outer_list =
+        std::get<BencodeList>(torrent_info.at("announce-list").data);
+
+    for (const auto &tier_node : outer_list) {
+      auto tier_list = std::get<BencodeList>(tier_node.data);
+
+      for (const auto &url_node : tier_list) {
+        std::string url = std::get<std::string>(url_node.data);
+        announce_list.push_back(url);
+      }
+    }
+  }
   BencodeNode info_node = torrent_info.at("info");
   BencodeDict info = std::get<BencodeDict>(info_node.data);
 
@@ -25,41 +39,40 @@ TorrentFile::TorrentFile(const std::string &filepath) {
   name = std::get<std::string>(info.at("name").data);
 
   if (info.count("length")) {
-      is_folder = false;
-      total_length = std::get<long long>(info.at("length").data);
+    is_folder = false;
+    total_length = std::get<long long>(info.at("length").data);
 
-      FileEntry file;
-      file.path = name;
-      file.length = total_length;
-      file.offset = 0;
-      file_list.push_back(file);
+    FileEntry file;
+    file.path = name;
+    file.length = total_length;
+    file.offset = 0;
+    file_list.push_back(file);
   } else if (info.count("files")) {
-      is_folder = true;
-      long long current_global_offset = 0;
+    is_folder = true;
+    long long current_global_offset = 0;
 
-      BencodeList files = std::get<BencodeList>(info.at("files").data);
-      for (const auto& file: files) {
-          BencodeDict file_dict = std::get<BencodeDict>(file.data);
+    BencodeList files = std::get<BencodeList>(info.at("files").data);
+    for (const auto &file : files) {
+      BencodeDict file_dict = std::get<BencodeDict>(file.data);
 
-
-          std::string full_path = name;
-          BencodeList path_list = std::get<BencodeList>(file_dict.at("path").data);
-          for (const auto& path : path_list) {
-               full_path += "/" + std::get<std::string>(path.data);
-          }
-
-
-          FileEntry file_entry;
-          file_entry.path = full_path;
-          file_entry.length = std::get<long long>(file_dict.at("length").data);
-          file_entry.offset = current_global_offset;
-          file_list.push_back(file_entry);
-
-          current_global_offset += file_entry.length;
+      std::string full_path = name;
+      BencodeList path_list = std::get<BencodeList>(file_dict.at("path").data);
+      for (const auto &path : path_list) {
+        full_path += "/" + std::get<std::string>(path.data);
       }
-      total_length = current_global_offset;
+
+      FileEntry file_entry;
+      file_entry.path = full_path;
+      file_entry.length = std::get<long long>(file_dict.at("length").data);
+      file_entry.offset = current_global_offset;
+      file_list.push_back(file_entry);
+
+      current_global_offset += file_entry.length;
+    }
+    total_length = current_global_offset;
   } else {
-      throw std::runtime_error("Given Torrent has neither the field length nor files");
+    throw std::runtime_error(
+        "Given Torrent has neither the field length nor files");
   }
 
   std::string info_slice = encode_bencode(info_node);
@@ -72,11 +85,11 @@ TorrentFile::TorrentFile(const std::string &filepath) {
 }
 
 std::string TorrentFile::get_hash_for_piece(uint32_t piece_index) const {
-    size_t start = piece_index * 20;
+  size_t start = piece_index * 20;
 
-    if (start + 20 > master_pieces_string.length()) {
-        throw std::out_of_range("Requested piece index is out of bounds.");
-    }
+  if (start + 20 > master_pieces_string.length()) {
+    throw std::out_of_range("Requested piece index is out of bounds.");
+  }
 
-    return master_pieces_string.substr(start, 20);
+  return master_pieces_string.substr(start, 20);
 }

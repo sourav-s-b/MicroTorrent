@@ -9,3 +9,8 @@ target_include_directories(torrent_engine PUBLIC
 )
 
 target_compile_definitions(torrent_engine PUBLIC ASIO_STANDALONE)
+
+target_link_libraries(torrent_engine PUBLIC
+    OpenSSL::SSL
+    OpenSSL::Crypto
+)

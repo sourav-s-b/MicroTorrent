@@ -6,11 +6,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17")
     add_compile_definitions(WIN32_LEAN_AND_MEAN NOGDI _WIN32_WINNT=0x0A00)
     add_compile_options(/EHsc)
 endif()
 
+find_package(OpenSSL REQUIRED)
 
 include(FetchContent)
 FetchContent_Declare(
